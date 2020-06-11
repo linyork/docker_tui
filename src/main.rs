@@ -1,6 +1,6 @@
 #![allow(clippy::cognitive_complexity)]
-
 use std::io::{self, Write};
+use std::process::Command as StdCommand;
 
 pub use crossterm::{
     cursor,
@@ -10,10 +10,6 @@ pub use crossterm::{
     Command, Result,
 };
 
-#[macro_use]
-mod macros;
-// mod test;
-
 const MENU: &str = r#"__   __            _
 \ \ / /___   _ __ | | __ ___  _ __
  \ V // _ \ | '__|| |/ // _ \| '__|
@@ -21,6 +17,8 @@ const MENU: &str = r#"__   __            _
   |_| \___/ |_|   |_|\_\\___||_|   v0.1.0
 -------------------------------------------
 l.      顯示所有容器
+a.      開啟所有容器 (docker-compose.yml)
+c.      關閉所有容器
 q.      離開
 "#;
 
@@ -33,13 +31,13 @@ where
     terminal::enable_raw_mode()?;
 
     loop {
-        // queue!(
-        //     w,
-        //     style::ResetColor,
-        //     terminal::Clear(ClearType::All),
-        //     cursor::Hide,
-        //     cursor::MoveTo(1, 1)
-        // )?;
+        queue!(
+            w,
+            style::ResetColor,
+            terminal::Clear(ClearType::All),
+            cursor::Hide,
+            cursor::MoveTo(1, 1)
+        )?;
 
         for line in MENU.split('\n') {
             queue!(w, style::Print(line), cursor::MoveToNextLine(1))?;
@@ -48,21 +46,39 @@ where
         w.flush()?;
 
         match read_char()? {
-            // '1' => test::cursor::run(w)?,
-            // '2' => test::color::run(w)?,
-            // '3' => test::attribute::run(w)?,
-            // '4' => test::event::run(w)?,
+            'l' => {
+                StdCommand::new("docker")
+                    .arg("ps")
+                    .arg("-a")
+                    .arg("--format")
+                    .arg("table \r{{.Names}}\t{{.Status}}\t{{.Ports}}\t{{.ID}}")
+                    .spawn()
+                    .expect("Show container error.");
+            }
+            'a' => {
+                StdCommand::new("docker-compose")
+                    .arg("up")
+                    .arg("-d")
+                    .spawn()
+                    .expect("docker-compose up error.");
+            }
+            'c' => {
+                StdCommand::new("docker-compose")
+                    .arg("down")
+                    .spawn()
+                    .expect("docker-compose down error.");
+            }
             'q' => break,
             _ => {}
         };
     }
 
-    // execute!(
-    //     w,
-    //     style::ResetColor,
-    //     cursor::Show,
-    //     terminal::LeaveAlternateScreen
-    // )?;
+    execute!(
+        w,
+        style::ResetColor,
+        cursor::Show,
+        terminal::LeaveAlternateScreen
+    )?;
 
     terminal::disable_raw_mode()
 }
@@ -77,10 +93,6 @@ pub fn read_char() -> Result<char> {
             return Ok(c);
         }
     }
-}
-
-pub fn buffer_size() -> Result<(u16, u16)> {
-    terminal::size()
 }
 
 fn main() -> Result<()> {
